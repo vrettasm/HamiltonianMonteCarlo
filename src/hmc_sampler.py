@@ -43,7 +43,7 @@ class HMC(object):
 
         :param n_omitted: (int) Number of omitted samples (burn-in) period.
 
-        :param kappa: (int) Maximum number of leapfrog steps.
+        :param kappa: (int) Number of leapfrog steps.
 
         :param d_tau: (float) Time discretization in the leapfrog integration scheme.
 
@@ -208,7 +208,7 @@ class HMC(object):
         """
         Number of leapfrog steps accessor (getter).
 
-        :return: the maximum number of leapfrog steps.
+        :return: the number of leapfrog steps.
         """
         return self._options["kappa"]
 
@@ -225,13 +225,13 @@ class HMC(object):
         if isinstance(new_value, int):
 
             # Make sure we have only positive values.
-            if new_value > 10:
+            if new_value > 0:
 
                 # Assign the new value.
                 self._options["kappa"] = new_value
             else:
                 raise ValueError(f"{self.__class__.__name__}: "
-                                 f"Number of leapfrog steps should be > 10: {new_value}.")
+                                 f"Number of leapfrog steps should be positive: {new_value}.")
             # _end_if_
 
         else:
@@ -423,15 +423,12 @@ class HMC(object):
             # Perturb the length in the leapfrog steps by 0.1 (=10%).
             epsilon = mu * d_tau * (1.0 + 0.1 * _standard_normal(1))
 
-            # Choose leapfrog steps uniformly between [10 ... kappa].
-            KAPPA = rng.integers(10, kappa, endpoint=True, dtype=int)
-
             # First half-step of leapfrog.
             p -= 0.5 * epsilon * Q.T.dot(g_new)
             x_new += epsilon * p
 
-            # Full (KAPPA-1) leapfrog steps.
-            for _ in range(KAPPA - 1):
+            # Full (kappa-1) leapfrog steps.
+            for _ in range(kappa - 1):
                 p -= epsilon * Q.T.dot(self.grad(x_new, *args))
                 x_new += epsilon * Q.dot(p)
             # _end_for_
