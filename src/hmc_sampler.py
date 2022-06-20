@@ -4,6 +4,7 @@ from copy import deepcopy
 from time import perf_counter
 from scipy.linalg import circulant
 from scipy.optimize import check_grad
+from multiprocessing import cpu_count
 from scipy._lib._util import check_random_state
 
 
@@ -116,8 +117,11 @@ class HMC(object):
         # If we want parallel execution.
         if n_parallel:
 
-            # Make sure we have at least one CPU.
-            self._options["n_parallel"] = max(int(n_parallel), 1)
+            # Get the available number of CPUs.
+            num_cores = cpu_count()
+
+            # Make sure we are in the range [1, num_cores].
+            self._options["n_parallel"] = min(max(int(n_parallel), 1), num_cores)
         # _end_if_
 
         # Check the seed, before assignment.
@@ -359,7 +363,7 @@ class HMC(object):
         # Check for pre-conditioning.
         if self._options["generalized"]:
 
-            # Constant.
+            # Constant (should be optimized).
             _alpha = float(1.0/x_dim)
 
             # Construct a circulant matrix
@@ -407,6 +411,13 @@ class HMC(object):
 
         # Begin Hamiltonian Monte Carlo iterations.
         for i in range(-self._options["n_omitted"], self._options["n_samples"]):
+
+            # Check for parallel execution.
+            if (i >= 0) and self._options["n_parallel"]:
+                pass
+            else:
+                pass
+            # _end_if_
 
             # Initial momentum: p ~ N(0, 1).
             p = _standard_normal(x_dim)
