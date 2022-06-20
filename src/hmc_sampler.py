@@ -13,8 +13,6 @@ __all__ = ['HMC']
 
 class HMC(object):
     """
-        Basic references.
-
         1. Simon Duane, Anthony D. Kennedy, Brian J. Pendleton and Duncan Roweth (1987).
         "Hybrid Monte Carlo". Physics Letters B. 195 (2): 216–222.
 
@@ -29,23 +27,25 @@ class HMC(object):
     # Object variables.
     __slots__ = ("func", "grad", "_options", "_stats")
 
-    def __init__(self, func, grad, n_samples=10000, n_omitted=5000,
+    def __init__(self, func, grad, n_samples=10_000, n_omitted=5_000,
                  kappa=100, d_tau=0.01, n_parallel=None, rng_seed=None,
                  generalized=False, grad_check=False, verbose=False):
         """
         Default constructor of an HMC sampler object.
 
         :param func: (callable) Function that evaluates the new proposals.
+        This is the negative log probability we want to sample from.
 
-        :param grad: (callable) Gradient of the 'func' with respect to the new coordinates.
+        :param grad: (callable) Gradient of the 'func' with respect to the
+        new state.
 
         :param n_samples: (int) Number of samples.
 
         :param n_omitted: (int) Number of omitted samples (burn-in) period.
 
-        :param kappa: (int) Maximum number of leap-frog steps.
+        :param kappa: (int) Maximum number of leapfrog steps.
 
-        :param d_tau: (float) Time discretization in the leap-frog integration scheme.
+        :param d_tau: (float) Time discretization in the leapfrog integration scheme.
 
         :param n_parallel: (int) Number of parallel CPUs.
 
@@ -206,9 +206,9 @@ class HMC(object):
     @property
     def kappa(self):
         """
-        Number of leap-frog steps accessor (getter).
+        Number of leapfrog steps accessor (getter).
 
-        :return: the maximum number of leap-frog steps.
+        :return: the maximum number of leapfrog steps.
         """
         return self._options["kappa"]
 
@@ -219,24 +219,24 @@ class HMC(object):
         """
         Property accessor (setter).
 
-        :param new_value: (integer) value of the leap-frog steps.
+        :param new_value: (integer) value of the leapfrog steps.
         """
         # Check for correct type.
         if isinstance(new_value, int):
 
             # Make sure we have only positive values.
-            if new_value > 1:
+            if new_value > 10:
 
                 # Assign the new value.
                 self._options["kappa"] = new_value
             else:
                 raise ValueError(f"{self.__class__.__name__}: "
-                                 f"Number of leap-frog steps should be positive: {new_value}.")
+                                 f"Number of leapfrog steps should be > 10: {new_value}.")
             # _end_if_
 
         else:
             raise TypeError(f"{self.__class__.__name__}: "
-                            f"Number of leap-frog steps should be integer: {type(new_value)}.")
+                            f"Number of leapfrog steps should be integer: {type(new_value)}.")
         # _end_if_
 
     # _end_def_
@@ -244,9 +244,9 @@ class HMC(object):
     @property
     def delta_tau(self):
         """
-        Leap-frog integration step.
+        Leapfrog integration step.
 
-        :return: the 'dt' in the leap-frog integration.
+        :return: the 'dt' in the leapfrog integration.
         """
         return self._options["d_tau"]
 
@@ -257,7 +257,7 @@ class HMC(object):
         """
         Property accessor (setter).
 
-        :param new_value: (float) value of the leap-frog dt.
+        :param new_value: (float) value of the leapfrog dt.
         """
         # Check for correct type.
         if isinstance(new_value, float):
@@ -269,12 +269,12 @@ class HMC(object):
                 self._options["d_tau"] = new_value
             else:
                 raise ValueError(f"{self.__class__.__name__}: "
-                                 f"Value of leap-frog dt should be positive: {new_value}.")
+                                 f"Value of leapfrog dt should be positive: {new_value}.")
             # _end_if_
 
         else:
             raise TypeError(f"{self.__class__.__name__}: "
-                            f"Value of leap-frog dt should be float: {type(new_value)}.")
+                            f"Value of leapfrog dt should be float: {type(new_value)}.")
         # _end_if_
 
     # _end_def_
@@ -346,7 +346,7 @@ class HMC(object):
         # _end_if_
 
         # Every time we run a new sampling process we reset the statistics.
-        self._stats = {"LogE": [], "Samples": [], "Accepted": [],
+        self._stats = {"logE": [], "Samples": [], "Accepted": [],
                        "Elapsed_Time": -1}
 
         # Dimensionality of the input vector.
@@ -360,10 +360,16 @@ class HMC(object):
 
             # Construct a circulant matrix
             Q = circulant(np.exp(-_alpha*np.arange(0, x_dim)))
+
+            # Display start message.
+            print(" >>> Generalized HMC sampling started ... ")
         else:
 
             # Identity matrix.
             Q = np.eye(x_dim)
+
+            # Display start message.
+            print(" >>> HMC sampling started ... ")
         # _end_if_
 
         # First time.
@@ -378,17 +384,11 @@ class HMC(object):
         # Set initial values.
         E, g = fx0, gx0
 
-        # Accepted samples counter.
-        acc_counter = 0
-
-        # Acceptance ratio.
-        acc_ratio = 0
-
-        # Display start message.
-        print(" >>> HMC sampling started ... ")
+        # Accepted samples counter / acceptance ratio.
+        acc_counter, acc_ratio = 0, 0.0
 
         # Local copy of the random number generator.
-        rng = np.random.default_rng(self._options["rng_seed"])
+        rng = np.random.default_rng(self._options["rng_seed"].get_state()[1])
 
         # Local copies of 'delta tau' and 'kappa' constants.
         d_tau = self._options["d_tau"]
@@ -419,14 +419,14 @@ class HMC(object):
             # Perturb the length in the leapfrog steps by 0.1 (=10%).
             epsilon = mu * d_tau * (1.0 + 0.1 * _standard_normal(1))
 
-            # Choose leapfrog steps uniformly between [1 .. kappa].
-            KAPPA = rng.integers(kappa + 1, dtype=int)
+            # Choose leapfrog steps uniformly between [10 ... kappa].
+            KAPPA = rng.integers(10, kappa, endpoint=True, dtype=int)
 
-            # First half-step of leap-frog.
+            # First half-step of leapfrog.
             p -= 0.5 * epsilon * Q.T.dot(g_new)
             x_new += epsilon * p
 
-            # Full (KAPPA-1) leap-frog steps.
+            # Full (KAPPA-1) leapfrog steps.
             for _ in range(KAPPA - 1):
                 p -= epsilon * Q.T.dot(self.grad(x_new, *args))
                 x_new += epsilon * Q.dot(p)
@@ -435,7 +435,7 @@ class HMC(object):
             # Gradient at 'x_new'.
             g_new = self.grad(x_new, *args)
 
-            # Final half-step of leap-frog.
+            # Final half-step of leapfrog.
             p -= 0.5 * epsilon * Q.T.dot(g_new)
 
             # Compute the energy at the new point.
@@ -454,7 +454,7 @@ class HMC(object):
                 # Update the counters.
                 if i >= 0:
                     acc_counter += 1
-                    acc_ratio = acc_counter / (i + 1)
+                    acc_ratio = float(acc_counter) / (i + 1)
                 # _end_if_
 
                 # Update to the new states.
@@ -469,7 +469,7 @@ class HMC(object):
             # _end_if_
 
             # Save current energy value.
-            self._stats["logE"].append(E_new)
+            self._stats["logE"].append(E_new.item())
 
             # Update statistics:
             # These are not stored during the burn-in period (i < 0).
@@ -511,13 +511,13 @@ class HMC(object):
             print(f" Error: {diff_error}")
         # _end_if_
 
+        # Return the dictionary with the collected stats.
         return self._stats
     # _end_def_
 
     def __call__(self, *args, **kwargs):
         """
-        This is only a wrapper of the
-        "run" method.
+        This is only a wrapper of the "run" method.
         """
         return self.run(*args, **kwargs)
     # _end_def_
