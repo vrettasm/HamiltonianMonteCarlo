@@ -2,6 +2,7 @@ import numpy as np
 from numba import njit
 from copy import deepcopy
 from time import perf_counter
+from scipy.linalg import circulant
 from scipy.optimize import check_grad
 from scipy._lib._util import check_random_state
 
@@ -11,6 +12,19 @@ __all__ = ['HMC']
 
 
 class HMC(object):
+    """
+        Basic references.
+
+        1. Simon Duane, Anthony D. Kennedy, Brian J. Pendleton and Duncan Roweth (1987).
+        "Hybrid Monte Carlo". Physics Letters B. 195 (2): 216–222.
+
+        2. Radford M. Neal (1996). "Monte Carlo Implementation".
+        Bayesian Learning for Neural Networks. Springer. pp. 55–98.
+
+        3. Francis J. Alexander, Gregory L. Eyink and Juan M. Restrepo (2005).
+        "Accelerated Monte Carlo for Optimal Estimation of Time Series",
+        Journal of Statistical Physics, vol.119, pp: 1331-1345.
+    """
 
     # Object variables.
     __slots__ = ("func", "grad", "_options", "_stats")
@@ -232,7 +246,7 @@ class HMC(object):
         """
         Leap-frog integration step.
 
-        :return: the dt in the leap-frog integration.
+        :return: the 'dt' in the leap-frog integration.
         """
         return self._options["d_tau"]
 
@@ -338,6 +352,20 @@ class HMC(object):
         # Dimensionality of the input vector.
         x_dim = x.size
 
+        # Check for pre-conditioning.
+        if self._options["generalized"]:
+
+            # Constant.
+            _alpha = float(1.0/x_dim)
+
+            # Construct a circulant matrix
+            Q = circulant(np.exp(-_alpha*np.arange(0, x_dim)))
+        else:
+
+            # Identity matrix.
+            Q = np.eye(x_dim)
+        # _end_if_
+
         # First time.
         t0 = perf_counter()
 
@@ -394,21 +422,21 @@ class HMC(object):
             # Choose leapfrog steps uniformly between [1 .. kappa].
             KAPPA = rng.integers(kappa + 1, dtype=int)
 
-            # First half-step of leapfrog.
-            p -= 0.5 * (epsilon * g_new)
-            x_new += (epsilon * p)
+            # First half-step of leap-frog.
+            p -= 0.5 * epsilon * Q.T.dot(g_new)
+            x_new += epsilon * p
 
-            # Full (KAPPA-1) leapfrog steps.
+            # Full (KAPPA-1) leap-frog steps.
             for _ in range(KAPPA - 1):
-                p -= epsilon * self.grad(x_new, *args)
-                x_new += (epsilon * p)
+                p -= epsilon * Q.T.dot(self.grad(x_new, *args))
+                x_new += epsilon * Q.dot(p)
             # _end_for_
 
             # Gradient at 'x_new'.
             g_new = self.grad(x_new, *args)
 
-            # Final half-step of leapfrog.
-            p -= (0.5 * epsilon * g_new)
+            # Final half-step of leap-frog.
+            p -= 0.5 * epsilon * Q.T.dot(g_new)
 
             # Compute the energy at the new point.
             E_new = self.func(x_new, *args)
