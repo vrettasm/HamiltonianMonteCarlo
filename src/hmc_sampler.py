@@ -339,10 +339,14 @@ class HMC(object):
 
         # Check numerically the gradients.
         if self._options['grad_check']:
+            # Display info for the user.
             print("Checking gradients <BEFORE> sampling ... ")
-            diff_error = check_grad(self.func, self.grad, deepcopy(x),
-                                    *args, direction='all')
-            print(f" Error: {diff_error}", end='\n')
+
+            # Get the grad-check error.
+            diff_error = check_grad(self.func, self.grad, deepcopy(x), *args)
+
+            # Display the error.
+            print(f" Error <BEFORE>: {diff_error}", end='\n')
         # _end_if_
 
         # Every time we run a new sampling process we reset the statistics.
@@ -483,7 +487,7 @@ class HMC(object):
 
                 # Display every 100 iterations.
                 if (i >= 0) and (np.mod(i, 100) == 0):
-                    print(' {0}:\tE={1:.3f}\tA/R={2:.3f}'.format(i, E, acc_ratio))
+                    print(f" {i:>6}: E={E:.3f} - Acceptance={acc_ratio:.3f}")
                 # _end_if_
 
             # _end_if_
@@ -504,11 +508,15 @@ class HMC(object):
 
         # Check numerically the gradients.
         if self._options['grad_check']:
+
+            # Display info for the user.
             print("Checking gradients <AFTER> sampling ... ")
-            diff_error = check_grad(self.func, self.grad,
-                                    deepcopy(x), *args,
-                                    direction='all')
-            print(f" Error: {diff_error}")
+
+            # Get the grad-check error.
+            diff_error = check_grad(self.func, self.grad, deepcopy(x), *args)
+
+            # Display the information.
+            print(f" Error <AFTER>: {diff_error}", end='\n')
         # _end_if_
 
         # Return the dictionary with the collected stats.
