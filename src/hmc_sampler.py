@@ -1,6 +1,5 @@
 import numpy as np
 from tqdm import tqdm
-from numba import njit
 from copy import deepcopy
 from time import perf_counter
 from scipy.linalg import circulant
@@ -314,20 +313,6 @@ class HMC(object):
         return self._options["verbose"]
     # _end_def_
 
-    @staticmethod
-    @njit(fastmath=True)
-    def fast_dot(v):
-        """
-        Computes a 'fast' numba compiled version
-        of the dot product --> v.T.dot(v).
-
-        :param v: numpy array (dim,)
-
-        :return: the (scalar) dot product (v, v)
-        """
-        return v.T.dot(v)
-    # _end_def_
-
     def run(self, x0, *args):
         """
 
@@ -342,20 +327,24 @@ class HMC(object):
         # the HMC search is a (copy) numpy array.
         x = np.asarray(x0, dtype=float).flatten()
 
+        # Local copies of the func/grad functions.
+        _func = self.func
+        _grad = self.grad
+
         # Check numerically the gradients.
         if self._options['grad_check']:
             # Display info for the user.
             print("Checking gradients <BEFORE> sampling ... ")
 
             # Get the grad-check error.
-            diff_error = check_grad(self.func, self.grad, deepcopy(x), *args)
+            diff_error = check_grad(_func, _grad, deepcopy(x), *args)
 
             # Display the error.
-            print(f" Error <BEFORE>: {diff_error}", end='\n')
+            print(f"Error <BEFORE> = {diff_error}", end='\n')
         # _end_if_
 
         # Every time we run a new sampling process we reset the statistics.
-        self._stats = {"logE": [], "Samples": [], "Accepted": [],
+        self._stats = {"Energies": [], "Samples": [], "Accepted": [],
                        "Elapsed_Time": -1}
 
         # Dimensionality of the input vector.
@@ -381,21 +370,6 @@ class HMC(object):
             print(" >>> HMC started ")
         # _end_if_
 
-        # First time.
-        t0 = perf_counter()
-
-        # Initial function evaluation.
-        fx0 = self.func(x, *args)
-
-        # Initial gradient evaluation.
-        gx0 = self.grad(x, *args)
-
-        # Set initial values.
-        E, g = fx0, gx0
-
-        # Accepted samples counter / acceptance ratio.
-        acc_counter, acc_ratio = 0, 0.0
-
         # Local copy of the random number generator.
         rng = np.random.default_rng(self._options["rng_seed"].get_state()[1])
 
@@ -407,8 +381,17 @@ class HMC(object):
         _uniform = rng.uniform
         _standard_normal = rng.standard_normal
 
-        # Local copy of the numba dot product.
-        _dot = self.fast_dot
+        # First time.
+        t0 = perf_counter()
+
+        # Initial function evaluation.
+        E = _func(x, *args)
+
+        # Initial gradient evaluation.
+        g = _grad(x, *args)
+
+        # Accepted samples counter / acceptance ratio.
+        acc_counter, acc_ratio = 0, 0.0
 
         # Create the progress bar.
         _tqdm = tqdm(range(-self._options["n_omitted"], self._options["n_samples"]),
@@ -417,14 +400,14 @@ class HMC(object):
         # Begin sampling iterations.
         for i in _tqdm:
 
+            # Copy the current state and gradient.
+            x_new, g_new = x.copy(), g.copy()
+
             # Initial momentum: p ~ N(0, 1).
             p = _standard_normal(x_dim)
 
             # Evaluate Hamiltonian.
-            H = E + (0.5 * _dot(p))
-
-            # Set the current state and gradient.
-            x_new, g_new = x.copy(), g.copy()
+            H = E + (0.5 * p.T.dot(p))
 
             # Change direction at random (~50% probability).
             mu = +1.0 if 0.5 > _uniform(0.0, 1.0) else -1.0
@@ -438,28 +421,29 @@ class HMC(object):
 
             # Full (kappa-1) leapfrog steps.
             for _ in range(kappa - 1):
-                p -= epsilon * Q.T.dot(self.grad(x_new, *args))
+                p -= epsilon * Q.T.dot(_grad(x_new, *args))
                 x_new += epsilon * Q.dot(p)
             # _end_for_
 
             # Gradient at 'x_new'.
-            g_new = self.grad(x_new, *args)
+            g_new = _grad(x_new, *args)
 
             # Final half-step of leapfrog.
             p -= 0.5 * epsilon * Q.T.dot(g_new)
 
             # Compute the energy at the new point.
-            E_new = self.func(x_new, *args)
+            E_new = _func(x_new, *args)
 
             # Compute the new Hamiltonian.
-            H_new = E_new + (0.5 * _dot(p))
+            H_new = E_new + (0.5 * p.T.dot(p))
 
-            # Compute the difference between
-            # the two Hamiltonian values.
+            # Compute the difference between the two Hamiltonian values.
             deltaH = H_new - H
 
-            # Check for acc_ratio.
-            if min(1, np.exp(-deltaH)) > _uniform(0.0, 1.0):
+            # Metropolis-Hastings acceptance criterion.
+            # A(x, x') = min(1.0, np.exp(-deltaH)), is
+            # also known as the acceptance probability.
+            if _uniform(0.0, 1.0) <= min(1.0, np.exp(-deltaH)):
 
                 # Update the counters.
                 if i >= 0:
@@ -467,7 +451,7 @@ class HMC(object):
                     acc_ratio = float(acc_counter) / (i + 1)
                 # _end_if_
 
-                # Update to the new states.
+                # Update the accepted states.
                 x, g, E = x_new, g_new, E_new
 
             # _end_if_
@@ -478,10 +462,9 @@ class HMC(object):
                                    f"Unexpected error happened at iteration {i}.")
             # _end_if_
 
-            # Save current energy value.
-            self._stats["logE"].append(E_new.item())
+            # Save the energy value.
+            self._stats["Energies"].append(E.item())
 
-            # Update statistics:
             # These are not stored during the burn-in period (i < 0).
             if i >= 0:
                 self._stats["Samples"].append(x)
@@ -495,8 +478,8 @@ class HMC(object):
                 if (i >= 0) and (np.mod(i, 500) == 0):
 
                     # Update the description in the progress bar.
-                    _tqdm.set_description(f" Iter={i} - E={E:.3f} - Acceptance={acc_ratio:.3f}")
-
+                    _tqdm.set_description(f" Iter={i} - E={E:.3f} -"
+                                          f" Acceptance={acc_ratio:.3f}")
                 # _end_if_
 
             # _end_if_
@@ -525,7 +508,7 @@ class HMC(object):
             diff_error = check_grad(self.func, self.grad, deepcopy(x), *args)
 
             # Display the information.
-            print(f" Error <AFTER>: {diff_error}", end='\n')
+            print(f"Error <AFTER> = {diff_error}", end='\n')
         # _end_if_
 
         # Return the dictionary with the collected stats.
