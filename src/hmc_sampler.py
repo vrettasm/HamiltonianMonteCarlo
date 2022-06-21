@@ -1,4 +1,5 @@
 import numpy as np
+from tqdm import tqdm
 from numba import njit
 from copy import deepcopy
 from time import perf_counter
@@ -370,14 +371,14 @@ class HMC(object):
             Q = circulant(np.exp(-_alpha*np.arange(0, x_dim)))
 
             # Display start message.
-            print(" >>> Generalized HMC sampling started ... ")
+            print(" >>> Generalized HMC ")
         else:
 
             # Identity matrix.
             Q = np.eye(x_dim)
 
             # Display start message.
-            print(" >>> HMC sampling started ... ")
+            print(" >>> HMC started ")
         # _end_if_
 
         # First time.
@@ -409,15 +410,12 @@ class HMC(object):
         # Local copy of the numba dot product.
         _dot = self.fast_dot
 
-        # Begin Hamiltonian Monte Carlo iterations.
-        for i in range(-self._options["n_omitted"], self._options["n_samples"]):
+        # Create the progress bar.
+        _tqdm = tqdm(range(-self._options["n_omitted"], self._options["n_samples"]),
+                     desc=" Sampling in progress ...")
 
-            # Check for parallel execution.
-            if (i >= 0) and self._options["n_parallel"]:
-                pass
-            else:
-                pass
-            # _end_if_
+        # Begin sampling iterations.
+        for i in _tqdm:
 
             # Initial momentum: p ~ N(0, 1).
             p = _standard_normal(x_dim)
@@ -493,9 +491,12 @@ class HMC(object):
             # Check for verbosity.
             if self._options["verbose"]:
 
-                # Display every 100 iterations.
-                if (i >= 0) and (np.mod(i, 100) == 0):
-                    print(f" {i:>6}: E={E:.3f} - Acceptance={acc_ratio:.3f}")
+                # Display every 'n' iterations.
+                if (i >= 0) and (np.mod(i, 500) == 0):
+
+                    # Update the description in the progress bar.
+                    _tqdm.set_description(f" Iter={i} - E={E:.3f} - Acceptance={acc_ratio:.3f}")
+
                 # _end_if_
 
             # _end_if_
@@ -509,7 +510,7 @@ class HMC(object):
         time_elapsed = tf-t0
 
         # Display finish message.
-        print(f" >>> HMC sampling finished in {time_elapsed} seconds.")
+        print(f" >>> HMC finished in {time_elapsed} seconds.")
 
         # Store the elapsed time.
         self._stats["Elapsed_Time"] = time_elapsed
