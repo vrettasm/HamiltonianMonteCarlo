@@ -48,7 +48,7 @@ class HMC(object):
 
         :param d_tau: (float) Time discretization in the leapfrog integration scheme.
 
-        :param n_parallel: (int) Number of parallel CPUs.
+        :param n_parallel: (int) Number of parallel chains (one per CPU).
 
         :param rng_seed: (int) Random number seed.
 
