@@ -546,8 +546,8 @@ class HMC(object):
 
         # Return the f-string.
         return f" HMC Id({id(self)}): \n" \
-               f" F(x)={self.func} \n" \
-               f" G(x)={self.grad} \n" \
+               f" Func(x)={self.func} \n" \
+               f" Grad(x)={self.grad} \n" \
                f" Options:\n {hmc_options}"
     # _end_def_
 
