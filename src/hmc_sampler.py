@@ -534,8 +534,8 @@ class HMC(object):
         hmc_options = ""
 
         # Get all the key-value pairs.
-        for key, value in self._options.items():
-            hmc_options += f"\t{key}: {value} \n"
+        for _key, _value in self._options.items():
+            hmc_options += f"\t{_key}: {_value}\n"
         # _end_for_
 
         # Return the f-string.
