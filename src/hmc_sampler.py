@@ -493,7 +493,7 @@ class HMC(object):
         time_elapsed = tf-t0
 
         # Display finish message.
-        print(f" >>> HMC finished in {time_elapsed} seconds.")
+        print(f" >>> HMC finished in {time_elapsed:.3f} seconds.")
 
         # Store the elapsed time.
         self._stats["Elapsed_Time"] = time_elapsed
@@ -523,11 +523,26 @@ class HMC(object):
     # _end_def_
 
     def __str__(self):
-        pass
-    # _end_def_
+        """
+        Override to print a readable string presentation of the object.
+        This will include its id along with its field values parameters.
 
-    def __repr__(self):
-        pass
+        :return: a string representation of an HMC object.
+        """
+
+        # Initialize options string.
+        hmc_options = ""
+
+        # Get all the key-value pairs.
+        for key, value in self._options.items():
+            hmc_options += f"\t{key}: {value} \n"
+        # _end_for_
+
+        # Return the f-string.
+        return f" HMC Id({id(self)}): \n" \
+               f" F(x)={self.func} \n" \
+               f" G(x)={self.grad} \n" \
+               f" Options:\n {hmc_options}"
     # _end_def_
 
 # _end_class_
