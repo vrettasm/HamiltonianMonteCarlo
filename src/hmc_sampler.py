@@ -475,7 +475,7 @@ class HMC(object):
             # _end_if_
 
             # Save the energy value.
-            self._stats["Energies"].append(E.item())
+            self._stats["Energies"].append(E)
 
             # These are not stored during the burn-in period (i < 0).
             if i >= 0:
