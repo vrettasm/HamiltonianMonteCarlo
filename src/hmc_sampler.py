@@ -313,14 +313,16 @@ class HMC(object):
         return self._options["verbose"]
     # _end_def_
 
+    # Main (sampling) operation.
     def run(self, x0, *args):
         """
+        Implements the HMS sampling routine.
 
-        :param x0:
+        :param x0: Initial point to sample: (x_dim,).
 
-        :param args:
+        :param args: Additional func/grad parameters.
 
-        :return:
+        :return: A dictionary with the collected stats.
         """
 
         # Make sure the initial starting point of
