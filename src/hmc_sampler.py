@@ -122,9 +122,13 @@ class HMC(object):
 
             # Make sure we are in the range [1, num_cores].
             self._options["n_parallel"] = min(max(int(n_parallel), 1), num_cores)
+
+            # Show a warning.
+            print(f"{self.__class__.__name__}: WARNING: This option is not implemented yet."
+                  f" The program will sample only one chain.")
         # _end_if_
 
-        # Check the seed, before assignment.
+        # Check the seed before assignment.
         self._options["rng_seed"] = check_random_state(rng_seed)
 
         # Initialize stats dictionary.
