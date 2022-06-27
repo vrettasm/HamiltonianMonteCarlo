@@ -137,8 +137,8 @@ class HMC(object):
         # Check the seed before assignment.
         self._options["rng_seed"] = check_random_state(rng_seed)
 
-        # Initialize stats dictionary.
-        self._stats = dict()
+        # Placeholder for stats dictionary.
+        self._stats = None
 
     # _end_def_
 
