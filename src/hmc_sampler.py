@@ -527,6 +527,80 @@ class HMC(object):
         return self._stats
     # _end_def_
 
+    # Auxiliary method.
+    def acf(self, lag_n=None):
+        """
+        Computes the sample auto-correlation function
+        values of the energy, for a given lag number.
+
+        :param lag_n: Lag value to compute the acf.
+
+        :return: a list with the acf values.
+        """
+
+        # Make sure the samples are an array.
+        x = np.asarray(self._stats["Energies"])
+
+        # Remove singleton dimensions.
+        x = np.squeeze(x)
+
+        # Check the number of input dimensions.
+        if x.ndim != 1:
+            raise ValueError(f"{self.__class__.__name__}: "
+                             f"Wrong number of dimensions -> {x.ndim}.")
+        # _end_if_
+
+        # Number of samples.
+        n_obs = int(x.size)
+
+        # Sanity check.
+        if n_obs == 0:
+            raise ValueError(f"{self.__class__.__name__}: The sample list is empty.")
+        # _end_if_
+
+        # Check for input.
+        if lag_n is None:
+
+            # Use a default value.
+            lag_n = min(int(np.ceil(10 * np.log10(n_obs))), n_obs - 1)
+        # _end_if_
+
+        # Check the bounds.
+        if -n_obs < lag_n < n_obs:
+
+            # Make sure the lag is positive.
+            lag_n = np.abs(lag_n)
+        else:
+
+            # Out of bounds error.
+            raise ValueError(f"{self.__class__.__name__}: "
+                             f"Value of 'lag_n' is out of bounds -> {lag_n}.")
+        # _end_if_
+
+        # Get the sample mean.
+        x_mu = x.mean()
+
+        # Sample auto-covariance at lag '0'.
+        acf_0 = np.cov((x - x_mu))
+
+        # Denominator for the loop.
+        kappa = float(n_obs) * acf_0
+
+        # We initialize the list with '1'.
+        acf_list = [1.0]
+
+        # Localize append method.
+        acf_list_append = acf_list.append
+
+        # Compute the sample acf values for every lag step [1: lag+1].
+        for i in range(1, lag_n + 1):
+            acf_list_append(np.sum((x[i:] - x_mu) * (x[:-i] - x_mu)) / kappa)
+        # _end_for_
+
+        # Return as list.
+        return acf_list
+    # _end_def_
+
     def __call__(self, *args, **kwargs):
         """
         This is only a wrapper of the "run" method.
