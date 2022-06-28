@@ -343,6 +343,11 @@ class HMC(object):
         _func = self.func
         _grad = self.grad
 
+        # Every time we run a new sampling process we reset all the
+        # statistics.
+        self._stats = {"Energies": [], "Samples": [], "Accepted": [],
+                       "Elapsed_Time": -1, "Grad_Check_Error": []}
+
         # Check numerically the gradients.
         if self._options['grad_check']:
             # Display info for the user.
@@ -351,13 +356,12 @@ class HMC(object):
             # Get the grad-check error.
             diff_error = check_grad(_func, _grad, deepcopy(x), *args)
 
+            # Append the error value.
+            self._stats["Grad_Check_Error"].append(diff_error)
+
             # Display the error.
             print(f"Error <BEFORE> = {diff_error}", end='\n')
         # _end_if_
-
-        # Every time we run a new sampling process we reset the statistics.
-        self._stats = {"Energies": [], "Samples": [], "Accepted": [],
-                       "Elapsed_Time": -1}
 
         # Dimensionality of the input vector.
         x_dim = x.size
@@ -518,6 +522,9 @@ class HMC(object):
 
             # Get the grad-check error.
             diff_error = check_grad(self.func, self.grad, deepcopy(x), *args)
+
+            # Append the error value.
+            self._stats["Grad_Check_Error"].append(diff_error)
 
             # Display the information.
             print(f"Error <AFTER> = {diff_error}", end='\n')
