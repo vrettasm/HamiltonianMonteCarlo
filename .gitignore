@@ -1,4 +1,5 @@
 logos/
 docs/
 .idea/
+.ipynb_checkpoints/
 src/__pycache__/
