@@ -417,7 +417,7 @@ class HMC(object):
         else:
 
             # Display start message only.
-            print(f" >>> Chain -> {chain} started ... ")
+            print(f" >>> Chain -> {chain} started ... ", flush=True)
         # _end_if_
 
         # Begin sampling iterations.
@@ -517,7 +517,7 @@ class HMC(object):
         time_elapsed = tf-t0
 
         # Display finish message.
-        print(f" >>> Chain -> {chain} finished in {time_elapsed:.3f} seconds.")
+        print(f" >>> Chain -> {chain} finished in {time_elapsed:.3f} seconds.", flush=True)
 
         # Store the elapsed time.
         chain_stats["Elapsed_Time"] = time_elapsed
@@ -526,13 +526,13 @@ class HMC(object):
         if self._options['grad_check']:
 
             # Display info for the user.
-            print(f"Chain: {chain}, checking gradients ... ")
+            print(f"Chain: {chain}, checking gradients ... ", flush=True)
 
             # Get the grad-check error.
             diff_error = check_grad(_func, _grad, deepcopy(x), *args)
 
             # Display the information.
-            print(f"Error <AFTER> = {diff_error}", end='\n')
+            print(f"Error <AFTER> = {diff_error}", end='\n', flush=True)
 
         # _end_if_
 
