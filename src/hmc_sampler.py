@@ -3,9 +3,9 @@ from tqdm import tqdm
 from copy import deepcopy
 from time import perf_counter
 from scipy.linalg import circulant
-# from joblib import Parallel, delayed
+from joblib import Parallel, delayed
 from scipy.optimize import check_grad
-# from multiprocessing import cpu_count
+from multiprocessing import cpu_count
 from scipy._lib._util import check_random_state
 
 
@@ -494,7 +494,7 @@ class HMC(object):
                 if (i >= 0) and (np.mod(i, 500) == 0):
 
                     # Update the description in the screen.
-                    chain_tqdm.set_description(f" Iter={i} | E={E:.3f} |"
+                    chain_tqdm.set_description(f" Chain -> {chain}: Iter={i} | E={E:.3f} |"
                                                f" Acceptance={acc_ratio:.3f}")
                 # _end_if_
 
@@ -574,15 +574,39 @@ class HMC(object):
         # First time.
         t0 = perf_counter()
 
-        # Run all the chains serially.
-        # TO-DO: This needs to be parallelized.
+        # Local copy of the single chain sampler.
+        _single_chain = self._sample_single_chain
+        
+        # List with the perturbed initial positions.
+        x_init = []
+        
+        # Create the perturbed 'x' initial points.
+        for _ in range(n_chains):
+        
+            # Perturb the initial 'x' with N(0, 0.1).
+            x_init.append(x + 0.1*rng.standard_normal(x.size))
+            
+        # _end_for_
+        
+        # Get the number of CPUs. Leave one CPU out.
+        n_cpus = max(cpu_count()-1, 1)
+        
+        # Check if the number of CPUS exceeds the number of chains.
+        if n_cpus > n_chains:
+
+            # In this case downgrade the number of cpus,
+            # because we can't use more the 1 CPU/Chain.
+            n_cpus = n_chains
+        # _end_if_
+        
+        # Run the multiple chains in parallel.
+        results = Parallel(n_jobs=n_cpus)(delayed(_single_chain)(x=x_init[i],
+                                                                 chain=i, *args) for i in range(n_chains))
+        # Extract the data.                                                                     
         for i in range(n_chains):
 
-            # Perturb the initial 'x' with N(0, 0.1).
-            x_init = x + 0.1*rng.standard_normal(x.size)
-
-            # Run the sampling HMC.
-            self._stats[f"Chain-{i}"] = self._sample_single_chain(x=x_init, chain=i, *args)
+            # Store locally the results.
+            self._stats[f"Chain-{i}"] = results[i]
         # _end_for_
 
         # Final time.
