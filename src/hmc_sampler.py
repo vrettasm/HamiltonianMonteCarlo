@@ -344,8 +344,8 @@ class HMC(object):
         _grad = self.grad
 
         # Every time we run a new sampling process we reset all the
-        # statistics.
-        self._stats = {"Energies": [], "Samples": [], "Accepted": [],
+        # statistics of the local chain.
+        chain_stats = {"Energies": [], "Accepted": [], "Samples": [],
                        "Elapsed_Time": -1, "Grad_Check_Error": []}
 
         # Check numerically the gradients.
@@ -357,7 +357,7 @@ class HMC(object):
             diff_error = check_grad(_func, _grad, deepcopy(x), *args)
 
             # Append the error value.
-            self._stats["Grad_Check_Error"].append(diff_error)
+            chain_stats["Grad_Check_Error"].append(diff_error)
 
             # Display the error.
             print(f"Error <BEFORE> = {diff_error}", end='\n')
@@ -479,12 +479,12 @@ class HMC(object):
             # _end_if_
 
             # Save the energy value.
-            self._stats["Energies"].append(E)
+            chain_stats["Energies"].append(E)
 
             # These are not stored during the burn-in period (i < 0).
             if i >= 0:
-                self._stats["Samples"].append(x)
-                self._stats['Accepted'].append(acc_ratio)
+                chain_stats["Samples"].append(x)
+                chain_stats['Accepted'].append(acc_ratio)
             # _end_if_
 
             # Check for verbosity.
@@ -512,7 +512,7 @@ class HMC(object):
         print(f" >>> HMC finished in {time_elapsed:.3f} seconds.")
 
         # Store the elapsed time.
-        self._stats["Elapsed_Time"] = time_elapsed
+        chain_stats["Elapsed_Time"] = time_elapsed
 
         # Check numerically the gradients.
         if self._options['grad_check']:
@@ -524,14 +524,17 @@ class HMC(object):
             diff_error = check_grad(self.func, self.grad, deepcopy(x), *args)
 
             # Append the error value.
-            self._stats["Grad_Check_Error"].append(diff_error)
+            chain_stats["Grad_Check_Error"].append(diff_error)
 
             # Display the information.
             print(f"Error <AFTER> = {diff_error}", end='\n')
         # _end_if_
 
-        # Return the dictionary with the collected stats.
-        return self._stats
+        # Make a deepcopy of the local chain stats.
+        self._stats["Chain-0"] = deepcopy(chain_stats)
+
+        # Return the local dictionary.
+        return chain_stats
     # _end_def_
 
     # Auxiliary method.
@@ -542,66 +545,74 @@ class HMC(object):
 
         :param lag_n: Lag value to compute the acf.
 
-        :return: a list with the acf values.
+        :return: a list (of lists) with the acf values
+        for all stored chains.
         """
 
-        # Make sure the samples are an array.
-        x = np.asarray(self._stats["Energies"])
+        # A list that will hold the ACF values
+        # for all the chains in the dictionary.
+        acf_list = []
 
-        # Remove singleton dimensions.
-        x = np.squeeze(x)
+        # Compute the ACF values for every stored chain.
+        for i, chain in enumerate(self._stats.values()):
 
-        # Check the number of input dimensions.
-        if x.ndim != 1:
-            raise ValueError(f"{self.__class__.__name__}: "
-                             f"Wrong number of dimensions -> {x.ndim}.")
-        # _end_if_
+            # Make sure the samples are an array.
+            x = np.asarray(chain["Energies"])
 
-        # Number of samples.
-        n_obs = int(x.size)
+            # Remove singleton dimensions.
+            x = np.squeeze(x)
 
-        # Sanity check.
-        if n_obs == 0:
-            raise ValueError(f"{self.__class__.__name__}: The sample list is empty.")
-        # _end_if_
+            # Check the number of input dimensions.
+            if x.ndim != 1:
+                raise ValueError(f"{self.__class__.__name__}: Chain -> {i}: "
+                                 f"Wrong number of dimensions -> {x.ndim}.")
+            # _end_if_
 
-        # Check for input.
-        if lag_n is None:
+            # Number of samples.
+            n_obs = int(x.size)
 
-            # Use a default value.
-            lag_n = min(int(np.ceil(10 * np.log10(n_obs))), n_obs - 1)
-        # _end_if_
+            # Sanity check.
+            if n_obs == 0:
+                raise ValueError(f"{self.__class__.__name__}: "
+                                 f"Chain -> {i}: The sample list is empty.")
+            # _end_if_
 
-        # Check the bounds.
-        if -n_obs < lag_n < n_obs:
+            # Check for input.
+            if lag_n is None:
 
-            # Make sure the lag is positive.
-            lag_n = np.abs(lag_n)
-        else:
+                # Use a default value.
+                lag_n = min(int(np.ceil(10 * np.log10(n_obs))), n_obs - 1)
+            # _end_if_
 
-            # Out of bounds error.
-            raise ValueError(f"{self.__class__.__name__}: "
-                             f"Value of 'lag_n' is out of bounds -> {lag_n}.")
-        # _end_if_
+            # Check the bounds.
+            if -n_obs < lag_n < n_obs:
 
-        # Get the sample mean.
-        x_mu = x.mean()
+                # Make sure the lag is positive.
+                lag_n = np.abs(lag_n)
+            else:
 
-        # Sample auto-covariance at lag '0'.
-        acf_0 = np.cov((x - x_mu))
+                # Out of bounds error.
+                raise ValueError(f"{self.__class__.__name__}: "
+                                 f"Value of 'lag_n' is out of bounds -> {lag_n}.")
+            # _end_if_
 
-        # Denominator for the loop.
-        kappa = float(n_obs) * acf_0
+            # Get the sample mean.
+            x_mu = x.mean()
 
-        # We initialize the list with '1'.
-        acf_list = [1.0]
+            # Sample auto-covariance at lag '0'.
+            acf_0 = np.cov((x - x_mu))
 
-        # Localize append method.
-        acf_list_append = acf_list.append
+            # Denominator for the loop.
+            kappa = float(n_obs) * acf_0
 
-        # Compute the sample acf values for every lag step [1: lag+1].
-        for i in range(1, lag_n + 1):
-            acf_list_append(np.sum((x[i:] - x_mu) * (x[:-i] - x_mu)) / kappa)
+            # Add a new list (initialize with '1').
+            acf_list.append([1.0])
+
+            # Compute the sample acf values for every lag step [1: lag+1].
+            for j in range(1, lag_n + 1):
+                acf_list[i].append(np.sum((x[j:] - x_mu) * (x[:-j] - x_mu)) / kappa)
+            # _end_for_
+
         # _end_for_
 
         # Return as list.
