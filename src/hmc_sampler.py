@@ -574,6 +574,8 @@ class HMC(object):
         # First time.
         t0 = perf_counter()
 
+        # Run all the chains serially.
+        # TO-DO: This needs to be parallelized.
         for i in range(n_chains):
 
             # Perturb the initial 'x' with N(0, 0.1).
