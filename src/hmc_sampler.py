@@ -610,11 +610,11 @@ class HMC(object):
         # Run the multiple chains in parallel.
         results = Parallel(n_jobs=n_cpus)(delayed(_single_chain)(x=x_init[i],
                                                                  chain=i, *args) for i in range(n_chains))
-        # Extract the data.                                                                     
-        for i in range(n_chains):
+        # Extract all the result data.
+        for j, result_j in enumerate(results, start=0):
 
-            # Store locally the results.
-            self._stats[f"Chain-{i}"] = results[i]
+            # Store each chain data separately.
+            self._stats[f"Chain-{j}"] = result_j
         # _end_for_
 
         # Final time.
