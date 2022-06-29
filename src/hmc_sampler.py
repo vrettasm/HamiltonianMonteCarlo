@@ -1,8 +1,8 @@
 import numpy as np
-from tqdm import tqdm
 from copy import deepcopy
 from time import perf_counter
 from scipy.linalg import circulant
+from joblib import Parallel, delayed
 from scipy.optimize import check_grad
 from multiprocessing import cpu_count
 from scipy._lib._util import check_random_state
@@ -129,17 +129,34 @@ class HMC(object):
             # Make sure we are in the range [1, num_cores].
             self._options["n_parallel"] = min(max(int(n_parallel), 1), num_cores)
 
-            # Show a warning.
-            print(f"{self.__class__.__name__}: WARNING: This option is not implemented yet."
-                  f" The program will sample only one chain.")
+        else:
+            # Default is '1' Chain/CPU.
+            self._options["n_parallel"] = 1
+        # _end_if_
+
+        # In case of multiple chains, disable verbose.
+        if self._options["n_parallel"] > 1:
+
+            # TO DO: Find a better solution.
+            self._options["verbose"] = False
         # _end_if_
 
         # Check the seed before assignment.
         self._options["rng_seed"] = check_random_state(rng_seed)
 
         # Placeholder for stats dictionary.
-        self._stats = None
+        self._stats = {f"Chain-{i}": None for i in range(self._options["n_parallel"])}
 
+    # _end_def_
+
+    @property
+    def n_chains(self):
+        """
+        Number of parallel chains accessor (getter).
+
+        :return: the number of chains.
+        """
+        return self._options["n_parallel"]
     # _end_def_
 
     @property
@@ -324,20 +341,19 @@ class HMC(object):
     # _end_def_
 
     # Main (sampling) operation.
-    def run(self, x0, *args):
+    def _sample_single_chain(self, x, chain, *args):
         """
-        Implements the HMS sampling routine.
+        Implements the HMS sampling routine for a single
+        chain.
 
-        :param x0: Initial point to sample: (x_dim,).
+        :param x: Initial point to sample: (x_dim,).
+
+        :param chain: Index/id of the (parallel) chain.
 
         :param args: Additional func/grad parameters.
 
         :return: A dictionary with the collected stats.
         """
-
-        # Make sure the initial starting point of
-        # the HMC search is a (copy) numpy array.
-        x = np.asarray(x0, dtype=float).flatten()
 
         # Local copies of the func/grad functions.
         _func = self.func
@@ -346,22 +362,7 @@ class HMC(object):
         # Every time we run a new sampling process we reset all the
         # statistics of the local chain.
         chain_stats = {"Energies": [], "Accepted": [], "Samples": [],
-                       "Elapsed_Time": -1, "Grad_Check_Error": []}
-
-        # Check numerically the gradients.
-        if self._options['grad_check']:
-            # Display info for the user.
-            print("Checking gradients <BEFORE> sampling ... ")
-
-            # Get the grad-check error.
-            diff_error = check_grad(_func, _grad, deepcopy(x), *args)
-
-            # Append the error value.
-            chain_stats["Grad_Check_Error"].append(diff_error)
-
-            # Display the error.
-            print(f"Error <BEFORE> = {diff_error}", end='\n')
-        # _end_if_
+                       "Elapsed_Time": -1}
 
         # Dimensionality of the input vector.
         x_dim = x.size
@@ -375,19 +376,24 @@ class HMC(object):
             # Construct a circulant matrix
             Q = circulant(np.exp(-_alpha*np.arange(0, x_dim)))
 
-            # Display start message.
-            print(" >>> Generalized HMC ")
         else:
 
             # Identity matrix.
             Q = np.eye(x_dim)
 
-            # Display start message.
-            print(" >>> HMC started ")
         # _end_if_
 
+        # Make sure the chain number is int.
+        chain = int(chain)
+
+        # Local chain identifier for the number generator.
+        chain_id = self._options["rng_seed"].get_state()[1] + (chain << 1)
+
         # Local copy of the random number generator.
-        rng = np.random.default_rng(self._options["rng_seed"].get_state()[1])
+        # NOTE: Since all the chains share the same rng seed we add a unique
+        # chain id number to the current rng seed, otherwise all chains will
+        # sample the same values.
+        rng = np.random.default_rng(chain_id)
 
         # Local copies of 'delta tau' and 'kappa' constants.
         d_tau = self._options["d_tau"]
@@ -409,12 +415,14 @@ class HMC(object):
         # Accepted samples counter / acceptance ratio.
         acc_counter, acc_ratio = 0, 0.0
 
-        # Create the progress bar.
-        _tqdm = tqdm(range(-self._options["n_omitted"], self._options["n_samples"]),
-                     desc=" Sampling in progress ...")
+        # Display start message.
+        if self._options["verbose"]:
+            print(f" >>> Chain -> {chain} started ... ")
+        # _end_if_
 
         # Begin sampling iterations.
-        for i in _tqdm:
+        for i in range(-self._options["n_omitted"],
+                       +self._options["n_samples"]):
 
             # Copy the current state and gradient.
             x_new, g_new = x.copy(), g.copy()
@@ -474,7 +482,7 @@ class HMC(object):
 
             # Check if something went wrong.
             if not np.isfinite(E_new):
-                raise RuntimeError(f"{self.__class__.__name__}: "
+                raise RuntimeError(f"{self.__class__.__name__}: Chain -> {chain}"
                                    f"Unexpected error happened at iteration {i}.")
             # _end_if_
 
@@ -493,9 +501,10 @@ class HMC(object):
                 # Display every 'n' iterations.
                 if (i >= 0) and (np.mod(i, 500) == 0):
 
-                    # Update the description in the progress bar.
-                    _tqdm.set_description(f" Iter={i} - E={E:.3f} -"
-                                          f" Acceptance={acc_ratio:.3f}")
+                    # Update the description in the screen.
+                    print(f" Chain -> {chain}: Iter={i} - E={E:.3f} -"
+                          f" Acceptance={acc_ratio:.3f}")
+
                 # _end_if_
 
             # _end_if_
@@ -509,7 +518,9 @@ class HMC(object):
         time_elapsed = tf-t0
 
         # Display finish message.
-        print(f" >>> HMC finished in {time_elapsed:.3f} seconds.")
+        if self._options["verbose"]:
+            print(f" >>> Chain -> {chain} finished in {time_elapsed:.3f} seconds.")
+        # _end_if_
 
         # Store the elapsed time.
         chain_stats["Elapsed_Time"] = time_elapsed
@@ -518,24 +529,94 @@ class HMC(object):
         if self._options['grad_check']:
 
             # Display info for the user.
-            print("Checking gradients <AFTER> sampling ... ")
+            if self._options["verbose"]:
+                print(f"Chain: {chain}, checking gradients ... ")
+            # _end_if_
 
             # Get the grad-check error.
-            diff_error = check_grad(self.func, self.grad, deepcopy(x), *args)
-
-            # Append the error value.
-            chain_stats["Grad_Check_Error"].append(diff_error)
+            diff_error = check_grad(_func, _grad, deepcopy(x), *args)
 
             # Display the information.
-            print(f"Error <AFTER> = {diff_error}", end='\n')
-        # _end_if_
+            if self._options["verbose"]:
+                print(f"Error <AFTER> = {diff_error}", end='\n')
+            # _end_if_
 
-        # Make a deepcopy of the local chain stats.
-        self._stats["Chain-0"] = deepcopy(chain_stats)
+        # _end_if_
 
         # Return the local dictionary.
         return chain_stats
     # _end_def_
+
+    def run(self, x0, *args):
+        """
+        Implements the HMS sampling routine for all
+        the parallel chains.
+
+        :param x0: Initial point to sample: (x_dim,).
+
+        :param args: Additional func/grad parameters.
+
+        :return: A dictionary with the collected data
+        from all the parallel chains.
+        """
+
+        # Make sure the initial starting point of
+        # the HMC search is a (copy) numpy array.
+        x = np.asarray(x0, dtype=float).flatten()
+
+        # Check numerically the gradients.
+        if self._options['grad_check']:
+
+            # Display info for the user.
+            print("Checking gradients <BEFORE> sampling ... ")
+
+            # Get the grad-check error.
+            diff_error = check_grad(self.func, self.grad, deepcopy(x), *args)
+
+            # Display the error.
+            print(f"Error <BEFORE> = {diff_error}", end='\n\n')
+        # _end_if_
+
+        # Localize sampling function.
+        _single_chain = self._sample_single_chain
+
+        # Get the number of parallel chains.
+        n_chains = self._options["n_parallel"]
+
+        # Stores the initial (perturbed) points.
+        x_init = []
+
+        # Get the random seed.
+        rng = np.random.default_rng(self._options["rng_seed"].get_state()[1])
+
+        # Perturb the initial 'x' with N(0,1).
+        for i in range(n_chains):
+            x_init.append(x + rng.standard_normal(x.size))
+        # _end_for_
+
+        # Display start message.
+        print(f" HMC started with {n_chains} chain(s) ... ")
+
+        # First time.
+        t0 = perf_counter()
+
+        # Run the chains in parallel.
+        results = Parallel(n_jobs=n_chains)(delayed(_single_chain)(x=x_init[i],
+                                                                   chain=i, *args) for i in range(n_chains))
+        # Final time.
+        tf = perf_counter()
+
+        # Display finish message.
+        print(f" HMC finished in {tf - t0:.3f} seconds.")
+
+        # Make a copy of the results to the object.
+        for i, res_i in enumerate(results, start=0):
+            self._stats[f"Chain-{i}"] = results[i]
+        # _end_for_
+
+        # Return the dictionary.
+        return self._stats
+    # _end_if_
 
     # Auxiliary method.
     def acf(self, lag_n=None):
