@@ -18,5 +18,6 @@ The generalized sampling approach is described in:
    Journal of Statistical Physics, vol.119, pp: 1331-1345.
 
 TO DO:
-1) Write description
-2) Add tests
+1) Write project description
+2) Think about the parallel chains
+3) Add unit tests
