@@ -608,8 +608,10 @@ class HMC(object):
         # _end_if_
         
         # Run the multiple chains in parallel.
-        results = Parallel(n_jobs=n_cpus)(delayed(_single_chain)(x=x_init[i],
-                                                                 chain=i, *args) for i in range(n_chains))
+        results = Parallel(n_jobs=n_cpus)(
+            delayed(_single_chain)(x=x_init[i], chain=i, *args) for i in range(n_chains)
+        )
+
         # Extract all the result data.
         for j, result_j in enumerate(results, start=0):
 
