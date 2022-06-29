@@ -1,4 +1,4 @@
-# HamiltonianMonteCarlo
+# Hamiltonian Monte Carlo (HMC)
 Hamiltonian Monte Carlo (HMC) sampling method.
 
 The original paper, that introduced this method is described in:
