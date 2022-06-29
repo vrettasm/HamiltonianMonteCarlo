@@ -576,8 +576,8 @@ class HMC(object):
 
         for i in range(n_chains):
 
-            # Perturb the initial 'x' with N(0,1).
-            x_init = x + rng.standard_normal(x.size)
+            # Perturb the initial 'x' with N(0, 0.1).
+            x_init = x + 0.1*rng.standard_normal(x.size)
 
             # Run the sampling HMC.
             self._stats[f"Chain-{i}"] = self._sample_single_chain(x=x_init, chain=i, *args)
