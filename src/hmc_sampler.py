@@ -406,15 +406,22 @@ class HMC(object):
         # Accepted samples counter / acceptance ratio.
         acc_counter, acc_ratio = 0, 0.0
 
-        # Display start message.
-        print(f"\n >>> Chain -> {chain} started ... ")
+        # Create a range object.
+        chain_range = range(-self._options["n_omitted"], self._options["n_samples"])
 
-        # Create a local tqdm object.
-        chain_tqdm = tqdm(range(-self._options["n_omitted"], self._options["n_samples"]),
-                          desc=f" Chain -> {chain} in progress ... ")
+        # If we have only one chain use tqdm.
+        if self._options["n_chains"] == 1:
+
+            # Create a local tqdm object.
+            chain_range = tqdm(chain_range, desc=f" Chain -> {chain} in progress ... ")
+        else:
+
+            # Display start message only.
+            print(f" >>> Chain -> {chain} started ... ")
+        # _end_if_
 
         # Begin sampling iterations.
-        for i in chain_tqdm:
+        for i in chain_range:
 
             # Copy the current state and gradient.
             x_new, g_new = x.copy(), g.copy()
@@ -487,15 +494,16 @@ class HMC(object):
                 chain_stats['Accepted'].append(acc_ratio)
             # _end_if_
 
-            # Check for verbosity.
-            if self._options["verbose"]:
+            # Check for verbosity when we have only one chain.
+            # Otherwise, the output will be cluttered by multiple threads.
+            if self._options["verbose"] and (self._options["n_chains"] == 1):
 
-                # Display every 'n' iterations.
+                # Display every 'n=500' iterations.
                 if (i >= 0) and (np.mod(i, 500) == 0):
 
-                    # Update the description in the screen.
-                    chain_tqdm.set_description(f" Chain -> {chain}: Iter={i} | E={E:.3f} |"
-                                               f" Acceptance={acc_ratio:.3f}")
+                    # Update the description in the tqdm.
+                    chain_range.set_description(f" Chain -> {chain}: Iter={i} | E={E:.3f} |"
+                                                f" Acceptance={acc_ratio:.3f}")
                 # _end_if_
 
             # _end_if_
