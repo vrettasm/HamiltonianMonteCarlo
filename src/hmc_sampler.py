@@ -407,7 +407,7 @@ class HMC(object):
         acc_counter, acc_ratio = 0, 0.0
 
         # Display start message.
-        print(f"\n>>> Chain -> {chain} started ... ")
+        print(f"\n >>> Chain -> {chain} started ... ")
 
         # Create a local tqdm object.
         chain_tqdm = tqdm(range(-self._options["n_omitted"], self._options["n_samples"]),
@@ -569,7 +569,7 @@ class HMC(object):
         rng = np.random.default_rng(self._options["rng_seed"].get_state()[1])
 
         # Display start message.
-        print(f" HMC started with {n_chains} chain(s) ... ")
+        print(f"HMC started with {n_chains} chain(s) ... ")
 
         # First time.
         t0 = perf_counter()
@@ -587,7 +587,7 @@ class HMC(object):
         tf = perf_counter()
 
         # Display finish message.
-        print(f" HMC finished in {tf - t0:.3f} seconds.")
+        print(f"HMC finished in {tf - t0:.3f} seconds.")
 
         # Return the dictionary.
         return self._stats
