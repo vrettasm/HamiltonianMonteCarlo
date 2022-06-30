@@ -537,7 +537,7 @@ class HMC(object):
 
             # Display the error information.
             print(f"Chain -> {chain}: Grad-Check "
-                  f"error <AFTER> sampling: {diff_error:.3E}", flush=True)
+                  f"error <AFTER> sampling = {diff_error:.3E}", flush=True)
         # _end_if_
 
         # Return the local dictionary.
@@ -573,7 +573,7 @@ class HMC(object):
             diff_error = check_grad(_func, _grad, x.copy(), *args)
 
             # Display the error.
-            print(f"Grad-Check error <BEFORE> sampling: {diff_error:.3E}\n")
+            print(f"Grad-Check error <BEFORE> sampling = {diff_error:.3E}\n")
 
         # _end_if_
 
