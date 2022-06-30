@@ -373,8 +373,10 @@ class HMC(object):
 
         else:
 
-            # Identity matrix.
-            Q = np.eye(x_dim)
+            # Here we should have the Identity Matrix.
+            # But a scalar "1.0" is much faster in the
+            # matrix multiplications!!
+            Q = np.array(1.0)
 
         # _end_if_
 
@@ -521,7 +523,8 @@ class HMC(object):
         time_elapsed = tf-t0
 
         # Display finish message.
-        print(f" >>> Chain -> {chain} finished in {time_elapsed:.3f} seconds.", flush=True)
+        print(f" >>> Chain -> {chain}"
+              f" finished in {time_elapsed:.3f} seconds.", flush=True)
 
         # Store the elapsed time.
         chain_stats["Elapsed_Time"] = time_elapsed
@@ -529,15 +532,12 @@ class HMC(object):
         # Check numerically the gradients.
         if options['grad_check']:
 
-            # Display info for the user.
-            print(f"Chain: {chain}, checking gradients ... ", flush=True)
-
             # Get the grad-check error.
             diff_error = check_grad(_func, _grad, x.copy(), *args)
 
-            # Display the information.
-            print(f"Error <AFTER> = {diff_error}", end='\n', flush=True)
-
+            # Display the error information.
+            print(f"Chain -> {chain}: "
+                  f"Grad-Check error at t=tf: {diff_error}", flush=True)
         # _end_if_
 
         # Return the local dictionary.
@@ -569,14 +569,12 @@ class HMC(object):
         # Check numerically the gradients.
         if self._options['grad_check']:
 
-            # Display info for the user.
-            print("Checking gradients <BEFORE> sampling ... ")
-
             # Get the grad-check error.
             diff_error = check_grad(_func, _grad, x.copy(), *args)
 
             # Display the error.
-            print(f"Error <BEFORE> = {diff_error}", end='\n\n')
+            print(f"Grad-Check error at t=0: {diff_error}", end='\n\n')
+
         # _end_if_
 
         # Get the number of parallel chains.
