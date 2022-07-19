@@ -1,5 +1,8 @@
 # Hamiltonian Monte Carlo (HMC)
+
 Hamiltonian Monte Carlo (HMC) sampling method.
+
+### References
 
 The original paper, that introduced this method is described in:
 
@@ -17,3 +20,11 @@ The generalized sampling approach is described in:
    "Accelerated Monte Carlo for Optimal Estimation of Time Series",
    Journal of Statistical Physics, vol.119, pp: 1331-1345.
 
+
+### Examples
+
+Some example on how to use this method can be found below:
+
+1. [Rosenbrock](./example_rosenbrock.ipynb)
+2. [Multi-variate Normal](./example_multivariate_normal.ipynb)
+3. [Ornstein-Uhlenbeck process](./example_ornstein_uhlenbeck.ipynb)
