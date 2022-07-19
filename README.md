@@ -20,6 +20,11 @@ The generalized sampling approach is described in:
    "Accelerated Monte Carlo for Optimal Estimation of Time Series",
    Journal of Statistical Physics, vol.119, pp: 1331-1345.
 
+### Requirements
+
+To ensure smooth execution please install the required modules with:
+
+      $ pip install -r requirements.txt
 
 ### Examples
 
