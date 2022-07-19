@@ -25,6 +25,6 @@ The generalized sampling approach is described in:
 
 Some example on how to use this method can be found below:
 
-1. [Rosenbrock](./example_rosenbrock.ipynb)
-2. [Multivariate Normal](./example_multivariate_normal.ipynb)
-3. [Ornstein-Uhlenbeck process](./example_ornstein_uhlenbeck.ipynb)
+1. [Rosenbrock](examples/example_rosenbrock.ipynb)
+2. [Multivariate Normal](examples/example_multivariate_normal.ipynb)
+3. [Ornstein-Uhlenbeck process](examples/example_ornstein_uhlenbeck.ipynb)
