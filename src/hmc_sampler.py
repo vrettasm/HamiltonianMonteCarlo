@@ -429,8 +429,8 @@ class HMC(object):
         # Start the sampling.
         for i in chain_range:
 
-            # Fresh copy the current state and
-            # its gradient.
+            # Fresh copy of the current state
+            # and its gradient.
             x_new, g_new = x.copy(), g.copy()
 
             # Reset momentum: p ~ N(0, 1).
