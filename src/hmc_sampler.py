@@ -136,7 +136,7 @@ class HMC(object):
         self._options["rng_seed"] = check_random_state(rng_seed)
 
         # Placeholder for stats dictionary.
-        self._stats = {f"Chain-{i}": None for i in range(self._options["n_chains"])}
+        self._stats = None
 
     # _end_def_
 
@@ -400,17 +400,8 @@ class HMC(object):
         _uniform = rng.uniform
         _standard_normal = rng.standard_normal
 
-        # First time.
-        t0 = perf_counter()
-
-        # Initial function evaluation.
-        E = _func(x, *args)
-
-        # Initial gradient evaluation.
-        g = _grad(x, *args)
-
         # Accepted samples counter / acceptance ratio.
-        acc_counter, acc_ratio = 0, 0.0
+        acc_counter, acc_ratio = int(0), float(0.0)
 
         # Create a range object.
         chain_range = range(-options["n_omitted"], options["n_samples"])
@@ -426,6 +417,19 @@ class HMC(object):
             print(f" >>> Chain -> {chain} started ... ", flush=True)
         # _end_if_
 
+        # Create a boolean flag that allows (or not) the display of extra
+        # information during sampling.
+        allow_display = options["verbose"] and (options["n_chains"] == 1)
+
+        # First time.
+        t0 = perf_counter()
+
+        # Initial function evaluation.
+        E = _func(x, *args)
+
+        # Initial gradient evaluation.
+        g = _grad(x, *args)
+
         # Start the sampling.
         for i in chain_range:
 
@@ -440,7 +444,7 @@ class HMC(object):
             H = E + (0.5 * p.T.dot(p))
 
             # Change direction at random (~50% probability).
-            mu = +1.0 if 0.5 > _uniform(0.0, 1.0) else -1.0
+            mu = -1.0 if _uniform(0.0, 1.0) < 0.5 else +1.0
 
             # Perturb the length of the leapfrog steps by 0.1 (=10%).
             epsilon = mu * d_tau * (1.0 + 0.1 * _standard_normal(1))
@@ -471,7 +475,7 @@ class HMC(object):
             deltaH = H_new - H
 
             # Metropolis-Hastings acceptance criterion.
-            # A(x, x') = min(1.0, np.exp(-deltaH)), is
+            # A(x', x) = min(1.0, np.exp(-deltaH)), is
             # also known as the acceptance probability.
             if _uniform(0.0, 1.0) <= min(1.0, np.exp(-deltaH)):
 
@@ -488,8 +492,8 @@ class HMC(object):
 
             # Check if something went wrong.
             if not np.isfinite(E_new):
-                raise RuntimeError(f"Chain -> {chain}: "
-                                   f"Unexpected error happened at iteration {i}.")
+                raise RuntimeError(f" Chain -> {chain}:"
+                                   f" Unexpected error happened at iteration {i}.")
             # _end_if_
 
             # Save the current energy value.
@@ -498,18 +502,18 @@ class HMC(object):
             # These are not stored during the burn-in period (i < 0).
             if i >= 0:
                 chain_stats["Samples"].append(x)
-                chain_stats['Accepted'].append(acc_ratio)
+                chain_stats["Accepted"].append(acc_ratio)
             # _end_if_
 
-            # Check for verbosity only when we have one chain.
-            # Otherwise, the output will be cluttered by multiple threads.
-            if options["verbose"] and (options["n_chains"] == 1):
+            # Check for display.
+            if allow_display:
 
-                # Display every 'n=500' iterations.
+                # Update every 'n' iterations.
                 if (i >= 0) and (np.mod(i, 500) == 0):
 
                     # Update the description in the tqdm.
-                    chain_range.set_description(f" Chain -> {chain}: Iter={i} | E={E:.3f} |"
+                    chain_range.set_description(f" Chain -> {chain}:"
+                                                f" Iter={i} | E={E:.3f} |"
                                                 f" Acceptance={acc_ratio:.3f}")
                 # _end_if_
 
@@ -517,11 +521,8 @@ class HMC(object):
 
         # _end_for_
 
-        # Final time.
-        tf = perf_counter()
-
         # Execution time (in seconds).
-        time_elapsed = tf-t0
+        time_elapsed = perf_counter() - t0
 
         # Display finish message.
         print(f" >>> Chain -> {chain}"
@@ -542,7 +543,7 @@ class HMC(object):
         # _end_if_
 
         # Return the local dictionary.
-        return chain_stats
+        return chain, chain_stats
     # _end_def_
 
     def run(self, x0, *args):
@@ -560,7 +561,13 @@ class HMC(object):
 
         # Make sure the initial starting point of
         # the HMC search is a (copy) numpy array.
-        x = np.asarray(x0, dtype=float).flatten()
+        x = np.asfarray(x0).flatten()
+
+        # Get the number of parallel chains.
+        n_chains = self._options["n_chains"]
+
+        # Make sure we clear the previous data.
+        self._stats = {f"Chain-{i}": None for i in range(n_chains)}
 
         # Local copies of the methods.
         _func = self.func
@@ -577,9 +584,6 @@ class HMC(object):
             print(f"Grad-Check error <BEFORE> sampling = {diff_error:.3E}\n")
 
         # _end_if_
-
-        # Get the number of parallel chains.
-        n_chains = self._options["n_chains"]
 
         # Get the random seed.
         rng = np.random.default_rng(self._options["rng_seed"].get_state()[1])
@@ -624,11 +628,14 @@ class HMC(object):
         # Display finish message.
         print(f"HMC finished in {tf - t0:.3f} seconds.")
 
-        # Extract all the result data.
-        for i, result_i in enumerate(results, start=0):
+        # Extract all the result.
+        for result_i in results:
+
+            # Get the chain number.
+            i = result_i[0]
 
             # Store each chain data separately.
-            self._stats[f"Chain-{i}"] = result_i
+            self._stats[f"Chain-{i}"] = result_i[1]
         # _end_for_
 
         # Return the dictionary.
@@ -638,14 +645,18 @@ class HMC(object):
     # Auxiliary method.
     def acf(self, lag_n=None):
         """
-        Computes the sample auto-correlation function
-        values of the energy, for a given lag number.
+        Computes the sample auto-correlation function values of the energy,
+        for a given lag number.
 
         :param lag_n: Lag value to compute the acf.
 
-        :return: a list (of lists) with the acf values
-        for all stored chains.
+        :return: a list (of lists) with the acf values for all stored chains.
         """
+
+        # Sanity check.
+        if self._stats is None:
+            raise NotImplementedError(f"{self.__class__.__name__}: Stats dictionary is not implemented.")
+        # _end_if_
 
         # A list that will hold the ACF values
         # for all the chains in the dictionary.
@@ -655,10 +666,10 @@ class HMC(object):
         for i, chain in enumerate(self._stats.values()):
 
             # Make sure the samples are an array.
-            x = np.asarray(chain["Energies"])
+            x = np.asfarray(chain["Energies"])
 
             # Remove singleton dimensions.
-            x = np.squeeze(x)
+            x = x.squeeze()
 
             # Check the number of input dimensions.
             if x.ndim != 1:
