@@ -477,7 +477,7 @@ class HMC(object):
             # Metropolis-Hastings acceptance criterion.
             # A(x', x) = min(1.0, np.exp(-deltaH)), is
             # also known as the acceptance probability.
-            if _uniform(0.0, 1.0) <= min(1.0, np.exp(-deltaH)):
+            if _uniform(0.0, 1.0) < min(1.0, np.exp(-deltaH)):
 
                 # Update the counters.
                 if i >= 0:
