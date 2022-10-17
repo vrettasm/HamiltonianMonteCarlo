@@ -396,8 +396,17 @@ class HMC(object):
         d_tau = options["d_tau"]
         kappa = options["kappa"]
 
-        # Local copies of random functions.
-        _uniform = rng.uniform
+        # Total number of samples (including the omitted).
+        TOTAL = options["n_omitted"] + options["n_samples"]
+
+        # Pre-sampled uniform values.
+        uniform_step = rng.uniform(low=0.0, high=1.0, size=TOTAL)
+        uniform_MHAC = rng.uniform(low=0.0, high=1.0, size=TOTAL)
+
+        # Pre-sampled standard normal values.
+        std_normal_perturb = rng.standard_normal(size=TOTAL)
+
+        # Local copy of standard normal dist.
         _standard_normal = rng.standard_normal
 
         # Accepted samples counter / acceptance ratio.
@@ -431,7 +440,7 @@ class HMC(object):
         g = _grad(x, *args)
 
         # Start the sampling.
-        for i in chain_range:
+        for j, i in enumerate(chain_range, start=0):
 
             # Fresh copy of the current state
             # and its gradient.
@@ -444,10 +453,10 @@ class HMC(object):
             H = E + (0.5 * p.T.dot(p))
 
             # Change direction at random (~50% probability).
-            mu = -1.0 if _uniform(0.0, 1.0) < 0.5 else +1.0
+            mu = -1.0 if uniform_step[j] < 0.5 else +1.0
 
-            # Perturb the length of the leapfrog steps by 0.1 (=10%).
-            epsilon = mu * d_tau * (1.0 + 0.1 * _standard_normal(1))
+            # Perturb the length of the leapfrog steps by 0.1 (~ 10%).
+            epsilon = mu * d_tau * (1.0 + 0.1 * std_normal_perturb[j])
 
             # First "half" leapfrog step.
             p -= 0.5 * epsilon * Q.T.dot(g_new)
@@ -477,7 +486,7 @@ class HMC(object):
             # Metropolis-Hastings acceptance criterion.
             # A(x', x) = min(1.0, np.exp(-deltaH)), is
             # also known as the acceptance probability.
-            if _uniform(0.0, 1.0) < min(1.0, np.exp(-deltaH)):
+            if uniform_MHAC[j] < min(1.0, np.exp(-deltaH)):
 
                 # Update the counters.
                 if i >= 0:
