@@ -1,3 +1,4 @@
 .idea/
 examples/.ipynb_checkpoints/
 src/__pycache__/
+src/tests/__pycache__/
